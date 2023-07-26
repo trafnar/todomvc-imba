@@ -138,5 +138,5 @@ export tag TodoMVC
 			<p> "Double-click to edit a todo"
 			
 			# Change this out with your name and url ↓
-			<p> "Created by {<a href="http://todomvc.com"> "you"}"
+			<p> "Created by {<a href="https://www.nathanmanousos.com"> "Nathan Manousos"}"
 			<p> "Part of {<a href="http://todomvc.com"> "TodoMVC"}"	
