@@ -69,7 +69,7 @@ export tag TodoMVC
 		todo.editHistory = todo.text
 		todo.editing = true
 		render()
-		self.querySelector("#todo-{i}-input").focus()
+		self.querySelector("#todo-{i}").focus()
 	
 	def abortEdit todo
 		todo.text = todo.editHistory
@@ -92,7 +92,7 @@ export tag TodoMVC
 		<section.todoapp>
 			<header.header>
 				<h1> "todos"
-				<form @submit.log('hi').prevent=addNewTodo(newTodoText)>
+				<form @submit.prevent=addNewTodo(newTodoText)>
 					<input bind=newTodoText .new-todo placeholder="What needs to be done?" autofocus>
 
 			if todos.length > 0
@@ -106,19 +106,16 @@ export tag TodoMVC
 						# These are here just to show the structure of the list items
 						# List items should get the class `editing` when editing and `completed` when marked as completed
 						for todo, i in getFilteredTodos()
-							<li key=todo .completed=todo.completed .editing=todo.editing>
-								<div.view>
-									<input.toggle @change=handleToggle(todo) type="checkbox" checked=todo.completed>
-									<label @dblclick=startEdit(todo, i)> todo.text
-									<button.destroy @click=deleteTodoByIndex(i)>
-
-								<form @submit.prevent=commitEdit(todo,i)>	
-									<input.edit
-										bind=todo.text
-										@blur=commitEdit(todo, i)
-										@hotkey('escape').if(todo.editing).force=abortEdit(todo)
-										id="todo-{i}-input"
-									>
+							<Todo
+								id="todo-{i}"
+								key=todo
+								todo=todo
+								@toggle=handleToggle(todo)
+								@startEdit=startEdit(todo, i)
+								@delete=deleteTodoByIndex(i)
+								@commitEdit=commitEdit(todo, i)
+								@abortEdit=abortEdit(todo)
+							>
 						
 			
 			if todos.length > 0
@@ -143,3 +140,24 @@ export tag TodoMVC
 			# Change this out with your name and url ↓
 			<p> "Created by {<a href="https://www.nathanmanousos.com"> "Nathan Manousos"}"
 			<p> "Part of {<a href="http://todomvc.com"> "TodoMVC"}"	
+
+
+
+tag Todo < li
+
+	prop todo
+
+	def focus do $input.focus()
+
+	<self .completed=todo.completed .editing=todo.editing>
+		<div.view>
+			<input.toggle @change.emit('toggle') type="checkbox" checked=todo.completed>
+			<label @dblclick.emit('startEdit')> todo.text
+			<button.destroy @click.emit('delete')>
+
+		<form @submit.prevent.emit('commitEdit')>	
+			<input$input.edit
+				bind=todo.text
+				@blur.emit('commitEdit')
+				@hotkey('escape').if(todo.editing).force.emit('abortEdit')
+			>
