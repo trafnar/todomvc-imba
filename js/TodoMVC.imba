@@ -106,10 +106,11 @@ export tag TodoMVC
 						# These are here just to show the structure of the list items
 						# List items should get the class `editing` when editing and `completed` when marked as completed
 						for todo, i in getFilteredTodos()
-							<Todo
-								id="todo-{i}"
+							<Todo id="todo-{i}"
 								key=todo
-								todo=todo
+								bind:text=todo.text
+								editing=todo.editing
+								completed=todo.completed
 								@toggle=handleToggle(todo)
 								@startEdit=startEdit(todo, i)
 								@delete=deleteTodoByIndex(i)
@@ -145,19 +146,21 @@ export tag TodoMVC
 
 tag Todo < li
 
-	prop todo
+	prop completed = false
+	prop text = "Untitled"
+	prop editing = false
 
 	def focus do $input.focus()
 
-	<self .completed=todo.completed .editing=todo.editing>
+	<self .completed=completed .editing=editing>
 		<div.view>
-			<input.toggle @change.emit('toggle') type="checkbox" checked=todo.completed>
-			<label @dblclick.emit('startEdit')> todo.text
+			<input.toggle @change.emit('toggle') type="checkbox" checked=completed>
+			<label @dblclick.emit('startEdit')> text
 			<button.destroy @click.emit('delete')>
 
 		<form @submit.prevent.emit('commitEdit')>	
 			<input$input.edit
-				bind=todo.text
+				bind=text
 				@blur.emit('commitEdit')
-				@hotkey('escape').if(todo.editing).force.emit('abortEdit')
+				@hotkey('escape').if(editing).force.emit('abortEdit')
 			>
