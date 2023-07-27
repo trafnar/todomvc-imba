@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "imba --web index.html"
+    "dev": "imba --web index.html",
+    "build": "imba build index.html"
   },
   "private": true,
   "dependencies": {
