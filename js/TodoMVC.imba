@@ -7,12 +7,24 @@ export tag TodoMVC
 		{text: "Buy a unicorn", completed: false, editing: false},
 	]
 
+	prop filter = null
+
 	def setup
 		todos = load()
 	
-	def routed
-		log 'routed'
-
+	def mount
+		router.on "hashchange" do doRouting()
+		doRouting()
+	
+	def doRouting
+		filter = router.hash.replace("#/", "").trim()
+		render()
+	
+	def getFilteredTodos
+		return getRemaining() if filter === "active"
+		return getCompleted() if filter === "completed"
+		return todos
+	
 	def persist todos
 		todos.map do(todo) { text: todo.text, completed: todo.completed, editing: false }
 		window.localStorage.setItem("todos-imba", JSON.stringify(todos))
@@ -80,7 +92,7 @@ export tag TodoMVC
 		<section.todoapp>
 			<header.header>
 				<h1> "todos"
-				<form @submit.prevent=addNewTodo(newTodoText)>
+				<form @submit.log('hi').prevent=addNewTodo(newTodoText)>
 					<input bind=newTodoText .new-todo placeholder="What needs to be done?" autofocus>
 
 			if todos.length > 0
@@ -93,30 +105,21 @@ export tag TodoMVC
 					<ul.todo-list>
 						# These are here just to show the structure of the list items
 						# List items should get the class `editing` when editing and `completed` when marked as completed
-						for todo, i in todos
+						for todo, i in getFilteredTodos()
 							<li key=todo .completed=todo.completed .editing=todo.editing>
 								<div.view>
 									<input.toggle @change=handleToggle(todo) type="checkbox" checked=todo.completed>
 									<label @dblclick=startEdit(todo, i)> todo.text
-									<button.destroy @click=deleteTodoByIndex(todo, i)>
-								
-								<input.edit
-									bind=todo.text
-									@blur=commitEdit(todo, i)
-									@hotkey('enter').force=commitEdit(todo, i)
-									@hotkey('escape').force=abortEdit(todo)
-									id="todo-{i}-input"
-								>
+									<button.destroy @click=deleteTodoByIndex(i)>
+
+								<form @submit.prevent=commitEdit(todo,i)>	
+									<input.edit
+										bind=todo.text
+										@blur=commitEdit(todo, i)
+										@hotkey('escape').if(todo.editing).force=abortEdit(todo)
+										id="todo-{i}-input"
+									>
 						
-						# <li>
-						# 	<div.view>
-						# 		<input.toggle type="checkbox">
-						# 		<label> "Buy a unicorn"
-						# 		<button.destroy>
-							
-						# 	<input.edit value="Rule the web">
-					
-				
 			
 			if todos.length > 0
 				# This footer should be hidden by default and shown when there are todos
@@ -126,9 +129,9 @@ export tag TodoMVC
 					
 					# Remove this if you don't implement routing
 					<ul.filters>
-						<li> <a.selected route-to="/"> "All"
-						<li> <a route-to="/active"> "Active"
-						<li> <a route-to="/completed"> "Completed"
+						<li> <a .selected=(filter !== "completed" and filter !== "active") route-to="/"> "All"
+						<li> <a route-to="#/active" .selected=(filter === "active")> "Active"
+						<li> <a route-to="#/completed" .selected=(filter === "completed")> "Completed"
 					
 					# Hidden if no completed items are left ↓
 					if completed.length > 0
