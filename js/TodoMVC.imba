@@ -1,139 +1,74 @@
+import { TodoMVCState } from './TodoMVCState'
 
+# This is the model/state of the app. It works fine as a standard variable here
+# it could also be added as a prop on the TodoMVC tag or made available to all tags
+# by extending the element tag: `extend tag element`
+const state = new TodoMVCState()
+
+def pluralize n, s do  if n === 1 then s else s + "s"
 
 export tag TodoMVC
 
-	prop todos = [
-		{text: "Taste JavaScript", completed: true, editing: false},
-		{text: "Buy a unicorn", completed: false, editing: false},
-	]
+	prop newTodoText = ""
 
-	prop filter = null
-
-	def setup
-		todos = load()
+	def handleAddTodo
+		state.addTodo(newTodoText)
+		newTodoText = ""
 	
 	def mount
+		# start listening for route changes
 		router.on "hashchange" do doRouting()
 		doRouting()
 	
 	def doRouting
-		filter = router.hash.replace("#/", "").trim()
+		state.setFilter router.hash.replace("#/", "").trim()
 		render()
 	
-	def getFilteredTodos
-		return getRemaining() if filter === "active"
-		return getCompleted() if filter === "completed"
-		return todos
-	
-	def persist todos
-		todos.map do(todo) { text: todo.text, completed: todo.completed, editing: false }
-		window.localStorage.setItem("todos-imba", JSON.stringify(todos))
+	def rendered
+		# update complete all checkbox state
+		$toggleAll.checked = state.remaining().length === 0 and state.todos.length > 0
 
-	def load
-		const raw = window.localStorage.getItem("todos-imba")
-		try JSON.parse(raw) ?? []
-		catch e return []
-
-	prop newTodoText = ""
-
-	def getRemaining do todos.filter(do(todo) !todo.completed)
-	def getCompleted do todos.filter(do(todo) todo.completed)
-
-	def setAll to\boolean do todo.completed = to for todo in todos
-	def updateToggleAll do $toggleAll.checked = todos.length > 0 and getRemaining().length === 0
-	
-	def clearCompleted
-		todos = todos.filter(do(todo) !todo.completed)
-		updateToggleAll()
-	
-	def deleteTodoByIndex index
-		todos.splice(index, 1)
-		updateToggleAll()
-		
-	def addNewTodo
-		const trimmed = newTodoText.trim()
-		return if trimmed.length === 0
-		todos.push { text: trimmed, completed:false, editing: false }
-		newTodoText = ""
-		persist(todos)
-	
-	def handleToggle todo
-		todo.completed = !todo.completed
-		persist(todos)
-		updateToggleAll()
-
-	def startEdit todo, i
-		for todo in todos
-			todo.editing = false
-			todo.editHistory = null
-		todo.editHistory = todo.text
-		todo.editing = true
-		render()
-		self.querySelector("#todo-{i}").focus()
-	
-	def abortEdit todo
-		todo.text = todo.editHistory
-		todo.editHistory = null
-		todo.editing = false
-
-	def commitEdit todo, i
-		const trimmed = todo.text.trim()
-		if trimmed.length === 0
-			deleteTodoByIndex(i)
-		else
-			todo.text = trimmed
-			todo.editHistory = null
-			todo.editing = false
-		persist(todos)
-	
 	<self>
-		const remaining = getRemaining()
-		const completed = getCompleted()
 		<section.todoapp>
 			<header.header>
 				<h1> "todos"
-				<form @submit.prevent=addNewTodo(newTodoText)>
+				<form @submit.prevent=handleAddTodo>
 					<input bind=newTodoText .new-todo placeholder="What needs to be done?" autofocus>
 
-			if todos.length > 0
+			if state.todos.length > 0
 				# This section should be hidden by default and shown when there are todos
 				<section.main>
 
-					<input$toggleAll id="toggle-all" .toggle-all type="checkbox" @change=setAll(e.target.checked)>
+					<input$toggleAll id="toggle-all" .toggle-all type="checkbox" @change=state.setAll($toggleAll.checked)>
 					<label for="toggle-all"> "Mark all as complete"
 
 					<ul.todo-list>
 						# These are here just to show the structure of the list items
 						# List items should get the class `editing` when editing and `completed` when marked as completed
-						for todo, i in getFilteredTodos()
-							<Todo id="todo-{i}"
-								key=todo
+						for todo, i in state.filteredTodos()
+							<Todo
+								key=todo.id
 								bind:text=todo.text
-								editing=todo.editing
 								completed=todo.completed
-								@toggle=handleToggle(todo)
-								@startEdit=startEdit(todo, i)
-								@delete=deleteTodoByIndex(i)
-								@commitEdit=commitEdit(todo, i)
-								@abortEdit=abortEdit(todo)
+								@toggle=state.toggleTodo(todo)
+								@delete=state.deleteTodo(todo)
 							>
-						
 			
-			if todos.length > 0
+			if state.todos.length > 0
 				# This footer should be hidden by default and shown when there are todos
 				<footer.footer>
 					# This should be `0 items left` by default
-					<span.todo-count> "{<strong> remaining.length} item{if remaining.length === 1 then "" else "s"} left"
+					<span.todo-count> "{state.remaining().length} {<strong> pluralize(state.remaining().length, "item" )} left"
 					
 					# Remove this if you don't implement routing
 					<ul.filters>
-						<li> <a .selected=(filter !== "completed" and filter !== "active") route-to="/"> "All"
-						<li> <a route-to="#/active" .selected=(filter === "active")> "Active"
-						<li> <a route-to="#/completed" .selected=(filter === "completed")> "Completed"
+						<li> <a .selected=( state.currentFilter == null ) route-to="/"> "All"
+						<li> <a route-to="#/active" .selected=(state.currentFilter === "active")> "Active"
+						<li> <a route-to="#/completed" .selected=(state.currentFilter === "completed")> "Completed"
 					
 					# Hidden if no completed items are left ↓
-					if completed.length > 0
-						<button.clear-completed @click=clearCompleted> "Clear completed"
+					if state.complete().length > 0
+						<button.clear-completed @click=state.clearComplete()> "Clear completed"
 
 		<footer.info>
 			<p> "Double-click to edit a todo"
@@ -149,18 +84,28 @@ tag Todo < li
 	prop completed = false
 	prop text = "Untitled"
 	prop editing = false
+	prop draftText = ""
 
-	def focus do $input.focus()
+	def startEdit
+		draftText = text
+		editing = true
+	
+	def commitEdit
+		text = draftText
+		draftText = ""
+	
+	def abortEdit
+		draftText = ""
 
 	<self .completed=completed .editing=editing>
 		<div.view>
 			<input.toggle @change.emit('toggle') type="checkbox" checked=completed>
-			<label @dblclick.emit('startEdit')> text
+			<label @dblclick=startEdit> text
 			<button.destroy @click.emit('delete')>
 
-		<form @submit.prevent.emit('commitEdit')>	
-			<input$input.edit
-				bind=text
-				@blur.emit('commitEdit')
-				@hotkey('escape').if(editing).force.emit('abortEdit')
+		<form @submit.prevent=commitEdit>	
+			<input.edit
+				bind=draftText
+				@blur=commitEdit
+				@hotkey('escape').if(editing).force=abortEdit
 			>
